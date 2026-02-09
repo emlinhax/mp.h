@@ -17,5 +17,5 @@ put mpengine.dll and all .vdm files into the same folder as the one you specify 
 thats really it. you can use the "everything" tool to find .vdm / mpengine.dll if you cant find it manually.
 
 # credits
-https://github.com/0xAlexei/WindowsDefenderTools
+https://github.com/0xAlexei/WindowsDefenderTools \
 https://github.com/ig-labs/defender-mpengine-fuzzing
