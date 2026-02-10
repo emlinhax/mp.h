@@ -4,8 +4,6 @@
 char buf[] = (...)
 int status = defender::boot("C:\\mpengine", "*.*");
 auto scan_result = defender::scan_buffer(buf, sizeof(buf));
-
-// will return a full struct including the threat name
 printf("%s\n", scan_result.second->identifier);
 
 // output
