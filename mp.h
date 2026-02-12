@@ -213,33 +213,33 @@ typedef struct _ENGINE_CONTEXT {
 
 typedef struct _BOOTENGINE_PARAMS {
     u64           client_version;
-    wchar_t*          sigs_location;
-    void*           spynet_src;
+    wchar_t* sigs_location;
+    void* spynet_src;
     PENGINE_CONFIG  engine_cfg;
     PENGINE_INFO    engine_info;
-    wchar_t*          scan_report_location;
+    wchar_t* scan_report_location;
     u32           boot_flags;
-    wchar_t*          local_copy_dir;
-    wchar_t*          offline_target_os;
+    wchar_t* local_copy_dir;
+    wchar_t* offline_target_os;
     CHAR            product_id[16];
     u64           field_34;
-    void*           global_callback;
+    void* global_callback;
     PENGINE_CONTEXT engine_ctx;
     u64           avg_cpu_load;
     CHAR            field_44[16];
-    wchar_t*          spynet_report_guid;
-    wchar_t*          spynet_version;
-    wchar_t*          nis_engine_version;
-    wchar_t*          nis_sigs_version;
+    wchar_t* spynet_report_guid;
+    wchar_t* spynet_version;
+    wchar_t* nis_engine_version;
+    wchar_t* nis_sigs_version;
     u64           flighting_enabled;
     u32           flighting_level;
-    void*           dynamic_cfg;
+    void* dynamic_cfg;
     u32           auto_sample_submission;
     u32           enable_thread_logging;
-    wchar_t*          product_name;
+    wchar_t* product_name;
     u32           passive_mode;
     u32           sense_enabled;
-    wchar_t*          sense_org_id;
+    wchar_t* sense_org_id;
     u32           attrs;
     u32           block_at_first_seen;
     u32           pua_protection;
@@ -310,7 +310,7 @@ typedef struct _STREAMBUFFER_DESCRIPTOR {
     u64(*write)(void*, u64, void*, u32, u32*);
     u64(*get_size)(void*, u64*);
     u64(*set_size)(void*, u64*);
-    wchar_t*(*get_name)(void*);
+    wchar_t* (*get_name)(void*);
     u64(*set_attributes)(void*, u32, void*, u32);
     u64(*get_attributes)(void*, u32, void*, u32, u32*);
 } STREAMBUFFER_DESCRIPTOR, * PSTREAMBUFFER_DESCRIPTOR;
@@ -333,38 +333,58 @@ namespace defender
         int type; // 0 = buffer, 1 = file
         char* data;
         size_t size; // file or buffer
-        wchar_t stream_name[64];
+        wchar_t* stream_name;
     };
 
+    static int enable_logging = 0;
     HMODULE mpengine_base;
     __rsignal prsignal;
-    scan_t* cur_scan;
+    thread_local scan_t* cur_scan = nullptr;
+
+    static void log(const char* format, ...)
+    {
+        if (!enable_logging) {
+            return;
+        }
+
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
+    }
 
     static u64 scan_callback(PSCANSTRUCT result)
     {
         if (result->flags & SCAN_MEMBERNAME) {
-            printf("[+] scanning archive member %s ...\n", result->identifier);
+            log("[+] scanning archive member %s ...\n", result->file_name);
         }
+
         if (result->flags & SCAN_FILENAME) {
-            printf("[+] scanning %s ...\n", result->file_name);
+            log("[+] scanning %s ...\n", result->file_name);
         }
+
         if (result->flags & SCAN_PACKERSTART) {
-            printf("[+] packer %s identified.\n", result->identifier);
+            log("[+] packer %s identified.\n", result->identifier);
         }
+
         if (result->flags & SCAN_ENCRYPTED) {
-            printf("[+] file may be encrypted.\n");
+            log("[+] file may be encrypted.\n");
         }
+
         if (result->flags & SCAN_CORRUPT) {
-            printf("[+] file may be corrupt.\n");
+            log("[+] file may be corrupt.\n");
         }
+
         if (result->flags & SCAN_FILETYPE) {
-            printf("[+] file %s is identified as %s\n", result->file_name, result->identifier);
+            log("[+] file %s is identified as %s\n", result->file_name, result->identifier);
         }
+
         if (result->flags & 0x08000022) {
-            printf("[+] threat %s identified.\n", result->identifier);
+            log("[+] threat %s identified.\n", result->identifier);
         }
+
         if ((result->flags & 0x40010000) == 0x40010000) {
-            printf("[+] threat %s identified (PUA).\n", result->identifier);
+            log("[+] threat %s identified (PUA).\n", result->identifier);
         }
 
         cur_scan->result = result;
@@ -442,7 +462,7 @@ namespace defender
         mpengine_base = LoadLibraryA((base_folder + "\\mpengine.dll").c_str());
         prsignal = (__rsignal)GetProcAddress(mpengine_base, "rsignal");
         if (!mpengine_base || !prsignal) {
-            printf("[!] failed to load mpengine. module missing?\n");
+            log("[!] failed to load mpengine. module missing?\n");
             return -1;
         }
 
@@ -450,7 +470,7 @@ namespace defender
         ENGINE_INFO engine_info;
         ENGINE_CONFIG engine_cfg;
 
-        printf("[+] booting engine...\n");
+        log("[+] booting engine...\n");
 
         memset(&boot_params, 0, sizeof boot_params);
         memset(&engine_info, 0, sizeof engine_info);
@@ -470,7 +490,7 @@ namespace defender
 
         SetCurrentDirectoryA(base_folder.c_str());
         int status = prsignal(RSIG_BOOTENGINE, &boot_params, sizeof boot_params); //
-        printf("[*] engine status: %d\n", status);
+        log("[*] engine status: %d\n", status);
 
         return status;
     }
@@ -485,5 +505,35 @@ namespace defender
 
         int status = scan(&_scan);
         return { status, _scan.result };
+    }
+
+    int scan_file(const char* file_path)
+    {
+        FILE* fp = fopen(file_path, "rb");
+        if (!fp) {
+            log("[!] Failed to open file: %s\n", file_path);
+            return -1;
+        }
+
+        fseek(fp, 0, SEEK_END);
+        size_t file_size = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+
+        char* file_data = (char*)malloc(file_size);
+        size_t bytes_read = fread(file_data, 1, file_size, fp);
+        fclose(fp);
+
+        scan_t scan_data;
+        scan_data.data = file_data;
+        scan_data.size = file_size;
+        scan_data.stream_name = c2wc((char*)file_path);
+        scan_data.result = NULL;
+
+        int result = scan(&scan_data);
+
+        delete[] scan_data.stream_name;
+        free(file_data);
+
+        return result;
     }
 }
