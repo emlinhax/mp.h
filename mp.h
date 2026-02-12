@@ -356,7 +356,7 @@ namespace defender
     static u64 scan_callback(PSCANSTRUCT result)
     {
         if (result->flags & SCAN_MEMBERNAME) {
-            log("[+] scanning archive member %s ...\n", result->file_name);
+            log("[+] scanning archive member %s ...\n", result->identifier);
         }
 
         if (result->flags & SCAN_FILENAME) {
