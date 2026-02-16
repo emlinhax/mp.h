@@ -502,17 +502,18 @@ namespace defender
         _scan.type = 0;
         _scan.size = size;
         _scan.result = 0;
+		_scan.stream_name = stream_name;
 
         int status = scan(&_scan);
         return { status, _scan.result };
     }
 
-    int scan_file(const char* file_path)
+    std::pair<int, PSCANSTRUCT> scan_file(const char* file_path)
     {
         FILE* fp = fopen(file_path, "rb");
         if (!fp) {
             log("[!] Failed to open file: %s\n", file_path);
-            return -1;
+            return { -1, 0 };
         }
 
         fseek(fp, 0, SEEK_END);
@@ -523,17 +524,15 @@ namespace defender
         size_t bytes_read = fread(file_data, 1, file_size, fp);
         fclose(fp);
 
-        scan_t scan_data;
-        scan_data.data = file_data;
-        scan_data.size = file_size;
-        scan_data.stream_name = c2wc((char*)file_path);
-        scan_data.result = NULL;
+        scan_t _scan = { 0 };
+        _scan.data = file_data;
+        _scan.type = 1;
+        _scan.size = file_size;
+        _scan.result = 0;
+        _scan.stream_name = c2wc((char*)file_path);
 
-        int result = scan(&scan_data);
-
-        delete[] scan_data.stream_name;
+        int status = scan(&_scan);
         free(file_data);
-
-        return result;
+        return { status, _scan.result };
     }
 }
